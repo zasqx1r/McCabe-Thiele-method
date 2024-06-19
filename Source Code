@@ -1,0 +1,73 @@
+import subprocess
+import time
+import win32com.client
+import pandas as pd
+import matplotlib.pyplot as plt
+
+
+def launch_aspen():
+    # Launch Aspen Plus V10
+    subprocess.Popen(["C:\Program Files (x86)\AspenTech\Aspen Plus V10.0\GUI\Xeq\AspenPlus.exe"])
+    time.sleep(10)  # Wait for Aspen Plus to open
+
+
+def get_user_inputs():
+    zF = float(input("Enter the feed composition (zF): "))
+    xD = float(input("Enter the distillate composition (xD): "))
+    xB = float(input("Enter the bottom composition (xB): "))
+    reflux_ratio = float(input("Enter the reflux ratio: "))
+    return zF, xD, xB, reflux_ratio
+
+
+def import_equilibrium_data(file_path):
+    return pd.read_excel(file_path)
+
+
+def setup_aspen_simulation(zF, xD, xB, reflux_ratio, equilibrium_data):
+    aspen = win32com.client.Dispatch("Apwn.Document")
+    aspen.InitFromTemplate(r"D:\Yugesh\IOE\GhitHUb Python Projects\MAcCabie\Distillation.apt")
+
+    # Add user-selected feed materials here (not automated due to manual selection requirement)
+    # Example: aspen.Tree.FindNode(r"\Data\Streams\Feed").Elements.Item(0).Value = zF
+
+    # Set up equilibrium data
+    # This part is simplified and may need adjustment based on your specific Aspen Plus template and data structure
+    for index, row in equilibrium_data.iterrows():
+        aspen.Tree.FindNode(fr"\Data\EquilibriumData\Point{index + 1}").Elements.Item(0).Value = row['Composition']
+        aspen.Tree.FindNode(fr"\Data\EquilibriumData\Point{index + 1}").Elements.Item(1).Value = row['Equilibrium']
+
+    aspen.Engine.Run2()
+    time.sleep(10)  # Wait for simulation to complete
+
+
+def retrieve_results():
+    aspen = win32com.client.Dispatch("Apwn.Document")
+    stages = aspen.Tree.FindNode(r"\Results\Summary\NumberOfStages").Value
+    return stages
+
+
+def plot_maccabe_thiele(zF, xD, xB, reflux_ratio, equilibrium_data):
+    # Example plot code, customize as needed
+    plt.figure()
+    plt.plot(equilibrium_data['Composition'], equilibrium_data['Equilibrium'], label='Equilibrium Curve')
+    plt.plot([zF, xD], [zF, xD], 'ro-', label='Operating Line')
+    plt.xlabel('Composition')
+    plt.ylabel('Equilibrium')
+    plt.legend()
+    plt.title('MacCabe-Thiele Diagram')
+    plt.savefig('MacCabe_Thiele_Diagram.png')
+    plt.show()
+
+
+def main():
+    launch_aspen()
+    zF, xD, xB, reflux_ratio = get_user_inputs()
+    equilibrium_data = import_equilibrium_data('D:\Yugesh\IOE\GhitHUb Python Projects\MAcCabie\Equilibrium Data.xlsx')
+    setup_aspen_simulation(zF, xD, xB, reflux_ratio, equilibrium_data)
+    stages = retrieve_results()
+    print(f"Number of stages: {stages}")
+    plot_maccabe_thiele(zF, xD, xB, reflux_ratio, equilibrium_data)
+
+
+if __name__ == "__main__":
+    main()
